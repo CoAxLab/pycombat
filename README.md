@@ -6,11 +6,11 @@ Combat is a technique for data harmonisation based on a linear mixed model in wh
 
 <img src="images/eq1.png" align="center"/>
 
-Original Combat tecnique allowed to keep the baseline effects $\alpha_k$ and the effects of interest $\beta_k$ by reintroducing these after harmonisation:
+Original Combat tecnique allowed to keep the baseline effects alpha and the effects of interest beta by reintroducing these after harmonisation:
 
 <img src="images/eq2.png" align="center"/>
 
-One extension of this python package is the possibility of removing unwanted variables' effect by no reintroducing them again. Using the same linear mixed model of the begining, we now separate the sources of covariation $C$ from sources of effects of interest $X$:
+One extension of this python package is the possibility of removing unwanted variables' effect by no reintroducing them again. Using the same linear mixed model of the begining, we now separate the sources of covariation *C* from sources of effects of interest *X*:
 
 <img src="images/eq3.png" align="center"/>
 
@@ -58,7 +58,7 @@ Now, you have to call the method **fit**, passsing it the data.
   - X: The matrix of effects of interest to keep, with dimensions [observations x features_interest]
   - C: The matrix of covariates to remove, with dimensions [observations x features_covariates]
 
-***Important:***  If you have effects of interest or covariates that involve categorical features, make sure that you drop the first level of these categories when building the independent matrices, otherwise they would be singular. You can easily accomplished this using the pandas and **pd.get_dummies** with the option *drop_first* checked.
+***Important:***  If you have effects of interest or covariates that involve categorical features, make sure that you drop the first level of these categories when building the independent matrices, otherwise they would be singular. You can easily accomplished this using pandas and **pd.get_dummies** with the option *drop_first* checked.
 
 After fitting the data, you can adjust it by calling the **trasnform** method:
 
