@@ -60,9 +60,9 @@ Now, you have to call the method **fit**, passsing it the data.
 
 ***Important:***  If you have effects of interest or covariates that involve categorical features, make sure that you drop the first level of these categories when building the independent matrices, otherwise they would be singular. You can easily accomplished this using pandas and **pd.get_dummies** with the option *drop_first* checked.
 
-After fitting the data, you can adjust it by calling the **trasnform** method:
+After fitting the data, you can adjust it by calling the **transform** method:
 
-    Y_adjusted = combat.trasnform(Y=Y, b=b, X=X, C=C)
+    Y_adjusted = combat.transform(Y=Y, b=b, X=X, C=C)
 
 Alternatively, you can combine both steps by just calling the method **fit_transform**:
 
