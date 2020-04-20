@@ -188,7 +188,7 @@ class Combat(object):
             C = None):
        
        n_sample = Y.shape[0]         
-       B = pd.get_dummies(b).values
+       B = pd.get_dummies(b, dtype=float).values
        n_batch = B.shape[1]
        sample_per_batch = B.sum(axis=0)
 
