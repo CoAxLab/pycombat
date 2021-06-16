@@ -11,3 +11,6 @@
 
 # Jupyter-notebook check points 
 /test/.ipynb_checkpoints
+
+# pycaches
+__pycache__/
