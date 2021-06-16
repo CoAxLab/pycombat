@@ -200,10 +200,26 @@ class Combat(object):
             DESCRIPTION.
 
         """
-        n_sample = Y.shape[0]
-        B = pd.get_dummies(b, dtype=float).values
+         # extract unique batch categories
+        batches = np.unique(b)
+        self.batches_ = batches
+
+        # Construct one-hot-encoding matrix for batches
+        B = np.column_stack([(b == b_name).astype(int)
+                             for b_name in self.batches_])
+
+        n_samples, n_features = Y.shape
         n_batch = B.shape[1]
+
+        if n_batch == 1:
+            raise ValueError('The number of batches should be at least 2')
+
         sample_per_batch = B.sum(axis=0)
+
+        if np.any(sample_per_batch == 1):
+            raise ValueError('Each batch should have at least 2 observations'
+                             'In the future, when this does not happens,'
+                             'only mean adjustment will take place')
 
         M = B.copy()
         if isinstance(X, np.ndarray):
@@ -223,15 +239,15 @@ class Combat(object):
                              np.matmul(M.T, Y))
 
         # Find intercepts
-        alpha_hat = np.matmul(sample_per_batch/float(n_sample),
+        alpha_hat = np.matmul(sample_per_batch/float(n_samples),
                               beta_hat[:n_batch, :])
         self.intercept_ = alpha_hat
         # Find slopes for covariates/effects
         beta_x = beta_hat[n_batch:end_x, :]
-        self.beta_x_ = beta_x
+        self.coefs_x_ = beta_x
 
         beta_c = beta_hat[end_x:end_c, :]
-        self.beta_c_ = beta_c
+        self.coefs_c_ = beta_c
 
         Y_hat = np.matmul(M, beta_hat)
         sigma = np.mean(((Y - Y_hat)**2), axis=0)
@@ -283,7 +299,7 @@ class Combat(object):
         del_sq_star = np.array(del_sq_star)
 
         self.gamma_ = gam_star
-        self.delta2_ = del_sq_star
+        self.delta_sq_ = del_sq_star
 
         return self
 
@@ -310,30 +326,32 @@ class Combat(object):
         """
         Y, b, X, C = self._validate_for_transform(Y, b, X, C)
 
-        B = pd.get_dummies(b).values
-        n_batch = B.shape[1]
+        test_batches = np.unique(b)
 
         # First standarise again the data
         Y_trans = Y - self.intercept_[np.newaxis, :]
 
-        if self.beta_x_.size > 0:
-            Y_trans -= np.matmul(X, self.beta_x_)
+        if self.coefs_x_.size > 0:
+            Y_trans -= np.matmul(X, self.coefs_x_)
 
-        if self.beta_c_.size > 0:
-            Y_trans -= np.matmul(C, self.beta_c_)
+        if self.coefs_c_.size > 0:
+            Y_trans -= np.matmul(C, self.coefs_c_)
 
         Y_trans /= np.sqrt(self.epsilon_)
+        
+        for batch in test_batches:
 
-        for ii in range(n_batch):
-            batch_idxs = (B[:, ii] == 1)
-            Y_trans[batch_idxs, :] -= self.gamma_[ii, :][np.newaxis, :]
-            Y_trans[batch_idxs, :] /= np.sqrt(self.delta2_[ii, :])
+            ix_batch = np.where(self.batches_ == batch)[0]
 
+            Y_trans[b == batch, :] -= self.gamma_[ix_batch]
+            Y_trans[b == batch, :] /= np.sqrt(self.delta_sq_[ix_batch, :])
         Y_trans *= np.sqrt(self.epsilon_)
+
+        # Add intercept
         Y_trans += self.intercept_[np.newaxis, :]
 
-        if self.beta_x_.size > 0:
-            Y_trans += np.matmul(X, self.beta_x_)
+        if self.coefs_x_.size > 0:
+            Y_trans += np.matmul(X, self.coefs_x_)
 
         return Y_trans
 
@@ -363,9 +381,9 @@ class Combat(object):
     def _validate_for_transform(self, Y, b, X, C):
 
         # check if fitted
-        attributes = ['intercept_', 'beta_x_',
-                      'beta_c_', 'epsilon_',
-                      'gamma_', 'delta2_']
+        attributes = ['intercept_', 'coefs_x_',
+                      'coefs_c_', 'epsilon_',
+                      'gamma_', 'delta_sq_']
 
         attrs = all([hasattr(self, attr) for attr in attributes])
         if not attrs:
@@ -376,11 +394,11 @@ class Combat(object):
         if len(np.unique(b)) != self.gamma_.shape[0]:
             raise ValueError("Wrong number of categories for b")
         if isinstance(X, np.ndarray):
-            if X.shape[1] != self.beta_x_.shape[0]:
+            if X.shape[1] != self.coefs_x_.shape[0]:
                 raise ValueError("Dimensions of fitted beta "
                                  "and input X matrix do not match")
         if isinstance(C, np.ndarray):
-            if C.shape[1] != self.beta_c_.shape[0]:
+            if C.shape[1] != self.coefs_c_.shape[0]:
                 raise ValueError("Dimensions of fitted beta "
                                  "and input C matrix do not match")
 
