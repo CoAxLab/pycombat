@@ -1,26 +1,11 @@
-
-
 from __future__ import absolute_import
-import pandas as pd
 import numpy as np
+from sklearn.utils import check_consistent_length
+from sklearn.utils.validation import column_or_1d
 
 
 def _compute_lambda(del_hat_sq):
-    """
-
-    Estimation of hyper-parameter lambda.
-
-    Parameters
-    ----------
-    del_hat_sq : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-
-    """
+    """Estimation of hyper-parameter lambda."""
     v = np.mean(del_hat_sq)
     s2 = np.var(del_hat_sq, ddof=1)
     # In Johnson 2007  there's a typo
@@ -30,22 +15,7 @@ def _compute_lambda(del_hat_sq):
 
 
 def _compute_theta(del_hat_sq):
-    """
-
-
-    Estimation of hyper-parameter theta.
-
-    Parameters
-    ----------
-    del_hat_sq : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-
-    """
+    """Estimation of hyper-parameter theta."""
     v = del_hat_sq.mean()
     s2 = np.var(del_hat_sq, ddof=1)
     return (v*s2+v**3)/s2
@@ -65,22 +35,7 @@ def _post_delta(x, Z, lam_bar, the_bar, n):
 
 
 def _inverse_gamma_moments(del_hat_sq):
-    """
-    Compute the inverse moments of the inverse gamma distribution.
-
-    Parameters
-    ----------
-    delta_hat_sq : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    lam_bar : TYPE
-        DESCRIPTION.
-    the_bar : TYPE
-        DESCRIPTION.
-
-    """
+    """Compute the inverse moments of the inverse gamma distribution."""
     lam_bar = np.apply_along_axis(_compute_lambda,
                                   arr=del_hat_sq,
                                   axis=1)
@@ -99,37 +54,7 @@ def _it_eb_param(Z_batch,
                  lam_bar_batch,
                  the_bar_batch,
                  conv):
-    """
-
-    Parametric EB estimation of location and scale paramaters.
-
-    Parameters
-    ----------
-    Z_batch : TYPE
-        DESCRIPTION.
-    gam_hat_batch : TYPE
-        DESCRIPTION.
-    del_hat_sq_batch : TYPE
-        DESCRIPTION.
-    gam_bar_batch : TYPE
-        DESCRIPTION.
-    tau_sq_batch : TYPE
-        DESCRIPTION.
-    lam_bar_batch : TYPE
-        DESCRIPTION.
-    the_bar_batch : TYPE
-        DESCRIPTION.
-    conv : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    gam_post : TYPE
-        DESCRIPTION.
-    del_sq_post : TYPE
-        DESCRIPTION.
-
-    """
+    """Parametric EB estimation of location and scale paramaters."""
     # Number of non nan samples within the batch for each variable
     n = np.sum(1 - np.isnan(Z_batch), axis=0)
     gam_prior = gam_hat_batch.copy()
@@ -175,32 +100,38 @@ class Combat(object):
         if (mode == 'p') | (mode == 'np'):
             self.mode = mode
         else:
-            raise IOError("mode can only be 'p' o 'np'")
+            raise ValueError("mode can only be 'p' o 'np'")
 
         self.conv = conv
 
     def fit(self, Y, b, X=None, C=None):
         """
-        Fit method.
+        Fit method, where Combat parameters are estimated
 
         Parameters
         ----------
-        Y : TYPE
-            DESCRIPTION.
-        b : TYPE
-            DESCRIPTION.
-        X : TYPE, optional
-            DESCRIPTION. The default is None.
-        C : TYPE, optional
-            DESCRIPTION. The default is None.
+        Y : array like of shape (n_samples, n_features)
+            Dataset to be harmonised.
+        b : array like of shape (n_samples, )
+            Vector of batch ids.
+        X : array like of shape (n_samples, mx), optional
+            Matrix with mx columns whose effects we want to preserve.
+            The default is None.
+        C : array like of shape (n_samples, mc), optional
+            Matrix with mc columns whose effects we want to remove.
+            The default is None.
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        self:  object
+            Fitted Estimator
 
         """
-         # extract unique batch categories
+        # Check length of all input arrays and ensure b is a vector
+        check_consistent_length(Y, b, X, C)
+        b = column_or_1d(b)
+
+        # extract unique batch categories
         batches = np.unique(b)
         self.batches_ = batches
 
@@ -221,6 +152,7 @@ class Combat(object):
                              'In the future, when this does not happens,'
                              'only mean adjustment will take place')
 
+        # Construct design matrix
         M = B.copy()
         if isinstance(X, np.ndarray):
             M = np.column_stack((M, X))
@@ -305,24 +237,25 @@ class Combat(object):
 
     def transform(self, Y, b, X=None, C=None):
         """
-        Transform method.
+        Transform method that effectively harmonises the input data.
 
         Parameters
         ----------
-        Y : TYPE
-            DESCRIPTION.
-        b : TYPE
-            DESCRIPTION.
-        X : TYPE, optional
-            DESCRIPTION. The default is None.
-        C : TYPE, optional
-            DESCRIPTION. The default is None.
+        Y : array like of shape (n_samples, n_features)
+            Dataset to be harmonised.
+        b : array like of shape (n_samples, )
+            Vector of batch ids.
+        X : array like of shape (n_samples, mx), optional
+            Matrix with mx columns whose effects we want to preserve.
+            The default is None.
+        C : array like of shape (n_samples, mc), optional
+            Matrix with mc columns whose effects we want to remove.
+            The default is None.
 
         Returns
         -------
-        Y_trans : TYPE
-            DESCRIPTION.
-
+        Y_trans : array like of shape (n_samples, n_features)
+            Harmonised dataset.
         """
         Y, b, X, C = self._validate_for_transform(Y, b, X, C)
 
@@ -338,7 +271,7 @@ class Combat(object):
             Y_trans -= np.matmul(C, self.coefs_c_)
 
         Y_trans /= np.sqrt(self.epsilon_)
-        
+
         for batch in test_batches:
 
             ix_batch = np.where(self.batches_ == batch)[0]
@@ -357,28 +290,32 @@ class Combat(object):
 
     def fit_transform(self, Y, b, X=None, C=None):
         """
-        Fit transform method.
+        Fit transform method, that first estimates the Combat parameters
+        and then harmonises the data.
 
-        Parameters
-        ----------
-        Y : TYPE
-            DESCRIPTION.
-        b : TYPE
-            DESCRIPTION.
-        X : TYPE, optional
-            DESCRIPTION. The default is None.
-        C : TYPE, optional
-            DESCRIPTION. The default is None.
+        Y : array like of shape (n_samples, n_features)
+            Dataset to be harmonised.
+        b : array like of shape (n_samples, )
+            Vector of batch ids.
+        X : array like of shape (n_samples, mx), optional
+            Matrix with mx columns whose effects we want to preserve.
+            The default is None.
+        C : array like of shape (n_samples, mc), optional
+            Matrix with mc columns whose effects we want to remove.
+            The default is None.
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        Y_trans : array like of shape (n_samples, n_features)
+            Harmonised dataset.
 
         """
         return self.fit(Y, b, X, C).transform(Y, b, X, C)
 
     def _validate_for_transform(self, Y, b, X, C):
+
+        check_consistent_length(Y, b, X, C)
+        b = column_or_1d(b)
 
         # check if fitted
         attributes = ['intercept_', 'coefs_x_',

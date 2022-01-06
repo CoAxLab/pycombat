@@ -11,6 +11,7 @@ import os
 
 from pycombat import Combat
 
+
 def test_combat():
     """Test to check that Combat effectively removes batchs effects."""
 
