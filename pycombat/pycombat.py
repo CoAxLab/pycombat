@@ -328,8 +328,8 @@ class Combat(object):
 
         if Y.shape[1] != len(self.intercept_):
             raise ValueError("Wrong number of features for Y")
-        if len(np.unique(b)) != self.gamma_.shape[0]:
-            raise ValueError("Wrong number of categories for b")
+        if not set(np.unique(b)).issubset(self.batches_):
+            raise ValueError("Unknown batches found in b")
         if isinstance(X, np.ndarray):
             if X.shape[1] != self.coefs_x_.shape[0]:
                 raise ValueError("Dimensions of fitted beta "
